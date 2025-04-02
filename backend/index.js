@@ -1,22 +1,16 @@
-// Load environment variables from .env file
+// server.js
 require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEN_AI_API_KEY = process.env.GEN_AI_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
-// Initialize the Google Generative AI client
-const genAI = new GoogleGenerativeAI(GEN_AI_API_KEY);
-
-// Middleware
 app.use(express.json());
 app.use(cors());
 
-// Route to handle chat requests
 app.post('/api/chat', async (req, res) => {
     const { prompt } = req.body;
 
@@ -25,18 +19,27 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        // Select the appropriate generative model
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const response = await axios.post(
+            'https://api.deepseek.com/v1/chat/completions',
+            {
+                model: 'deepseek-chat',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.7,
+                max_tokens: 2048
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-        // Generate content based on the provided prompt
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = await response.text();
-
-        res.json({ completion: text });
+        const completion = response.data.choices[0].message.content;
+        res.json({ completion });
     } catch (error) {
-        console.error('Error from Gen AI API:', error.message);
-        res.status(500).json({ error: 'Error communicating with Gen AI API' });
+        console.error('Error from DeepSeek API:', error.message);
+        res.status(500).json({ error: 'Error communicating with DeepSeek API' });
     }
 });
 
